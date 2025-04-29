@@ -6,6 +6,8 @@ It is a light wrapper for user to design and to integrate quantum circuit into P
 
 ## Basic usage
 
+The next code is an example to generate a quantum circuit layer.
+
 ```.{py}
 from torchpenny.moduel import QLayer
 from torchpenny.lib.qlayer.features import ZZfeatureMap
@@ -58,7 +60,7 @@ from torch import nn
 
 module = nn.Sequential([
     nn.Linear(20, 15)
-    qlayer # (15, 8)
+    qlayer # Its inoutput dimension is (15, 8)
     nn.Linear(8, 20)
 
 ])
