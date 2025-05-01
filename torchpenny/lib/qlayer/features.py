@@ -7,8 +7,7 @@ from torch.nn.parameter import Parameter
 class ZfeatureMap(QSubLayer):
     def init_weights(self):
         data = torch.empty(self.wires, requires_grad = False) if self.param_received else torch.rand(self.wires)
-        return data.unsqueeze(0) if self.param_received else Parameter(data.unsqueeze(0)) 
-    
+        return data.unsqueeze(0)
     def forward(self, x=None, wires=[]):
         assert len(wires) == (self.wires), "Applied wires must be matched with the defined qubit dimension."
         params = x if self.param_received and x is not None else self.params
@@ -35,7 +34,7 @@ class ZZfeatureMap(QSubLayer):
     def init_weights(self):
         n = self.wires-1 if self.only_zz else 2*self.wires -1
         data = torch.empty(n, requires_grad = False) if self.param_received else torch.rand(n)
-        return data.unsqueeze(0) if self.param_received else Parameter(data.unsqueeze(0)) 
+        return data.unsqueeze(0)
     
     def forward(self, x=None, wires=[]):
         assert len(wires) == (self.wires), "Applied wires must be matched with the defined qubit dimension."

@@ -1,10 +1,11 @@
-from typing import Union, Tuple, LiteralString
+from typing import Union, Tuple, LiteralString, Optional, Iterable
 from numbers import Number
 from abc import abstractmethod
+from inspect import signature
 
 import torch
 from torch import Tensor
-from torch.nn import Module
+from torch.nn import Module, Parameter
 
 from pennylane import (device as get_q_device, QNode)
 from pennylane.devices import Device as QDevice
@@ -13,12 +14,28 @@ from pennylane.operation import Operation, AnyWires
 from pennylane.wires import Wires
 
 class QSubLayer(Module):
+    #  구현한 Sublayer는 자체 Parameter를 가질 수도 있고, 외부에서 Parameter를 줄 수도 있어야 한다.
+    _input_module: dict[str, Optional[Tensor]]
+
     def __init__(self, wires:int, param_received=False):
         super(QSubLayer, self).__init__()
         assert wires > 0 and isinstance(wires, Number), "The given wires must be positive integer larger than 0."
         self.wires = int(wires)
         self.param_received = bool(param_received)
         self.params:Tensor = self._init_weights()
+    def __repr__(self):
+        st = super().__repr__()
+        if self.input_dim is not None:
+            class_name = self._get_name()
+            instance_name = class_name+f"[{self.input_dim[1]}]"
+            return st.replace(class_name, instance_name)
+        else:
+            return st
+    def __setattr__(self, name:str, value):
+        if name == "params" and isinstance(value, Tensor):
+            if not self.param_received:
+                value = Parameter(value) 
+        super().__setattr__(name, value)
     @property
     def input_dim(self):
         return self.params.shape if self.param_received else None
@@ -36,11 +53,13 @@ class QSubLayer(Module):
     def init_weights(self):
         # init_method
         # define the shape of the params
+        # You don't have to set Parameter or Tensor it will be set automatically considering param_recevied argument. 
         raise NotImplementedError
-    
     @abstractmethod
     def forward(self, x:Union[Tensor, None], wires:Tuple[int,...]):
         raise NotImplementedError
+    
+
     @abstractmethod
     def to_operation(self):
         """Generate the custom Pennylane gates of the defined model.
@@ -59,13 +78,16 @@ class QSubLayer(Module):
 
 
 class QLayer(Module):
+    _qsublayers:{Optional[QSubLayer]}
+
     def __init__(self, 
                  wires:int, 
-                 q_device:Union[str, QDevice], 
+                 q_device:Union[str, QDevice] = 'default.qubit', 
                  q_device_kwargs = {},
                  qnode_kwargs = {"diff_method": "parameter-shift"}
                  ):
         super(QLayer, self).__init__()
+        super().__setattr__("_qsublayers", {})
 
         self.wires = wires
         if isinstance(q_device, QDevice):
@@ -73,29 +95,68 @@ class QLayer(Module):
         elif isinstance(q_device, str):
             self.q_device = get_q_device(q_device, **q_device_kwargs)
     
-        def _circuit(x):
-            self.input_encoding(x)
-            self.inner_gates()
+        def _circuit(x:Optional[Union[Tensor, Tuple[Tensor]]] =None):
+            self._inner_gates(x)
             return self.measurement()
         
         if "interface" not in qnode_kwargs.keys():
             qnode_kwargs["interface"] = "torch"
         self.qnode = QNode(_circuit, device=self.q_device, **qnode_kwargs)
+    def __repr__(self):
+        pass
+    def _register_qsublayer(self, name, qsublayer:QSubLayer):
+        """Add QSubLayer to QLayer.
+
+        Args:
+            name (_type_): _description_
+            qsublayer (QSubLayer): _description_
+        """
+        if hasattr(self, name) and name not in self._qsublayers:
+            raise KeyError(f"attribute '{name}' already exists.")
+        self._qsublayers[name] = qsublayer
+
+    def __setattr__(self, name, value):
+        if isinstance(value, QSubLayer):
+            self._register_qsublayer(name, value)
+        super().__setattr__(name, value)
+    def __getattr__(self, name):
+        if name in self._qsublayers.keys():
+            return self._qsublayers[name]
+        return super().__getattr__(name)
+    @property
+    def input_features(self):
+        input_f_dict = {}
+        for k, v in self._qsublayers.items():
+            if v.input_dim is not None:
+                input_f_dict[k] = v.input_dim[1:]
+        return input_f_dict
+    
+    def _inner_gates(self, x):
+        arg_len = len(signature(self.inner_gates).parameters)
+        if arg_len == 0:
+            return self.inner_gates()
+        else:
+            return self.inner_gates(x)
 
     @abstractmethod
-    def input_encoding(self, x:Tensor):
-        raise NotImplementedError
-    def inner_gates(self):
+    def inner_gates(self, x:Optional[Union[Tensor, Tuple[Tensor]]]=None):
         pass
     @abstractmethod
     def measurement(self):
         raise NotImplementedError
     
-    def forward(self, x:Tensor):
-        # Assume that feature dimension is the last dimension.
-        *batch_dims, feat = x.shape
-        # Flatten leading dims
-        x_flat = x.reshape(-1, feat)
+    def forward(self, x:Optional[Tensor]=None):
+        if isinstance(x, Tensor):
+            # Assume that feature dimension is the last dimension.
+            *batch_dims, feat = x.shape
+            # Flatten leading dims
+            x_flat = x.reshape(-1, feat)
+        elif x is None:
+            x_flat = None
+            batch_dims = ()
+        elif isinstance(x, Iterable):
+            x_flat = x # In this case, the user have to verify and manage the batch cases.
+            batch_dims = ()
         vals = self.qnode(x_flat)
         # vals: list of (batch_flat,) tensors
         if isinstance(vals, Tensor):
@@ -103,6 +164,8 @@ class QLayer(Module):
         else:
             out_flat = torch.stack(vals, axis=1)
         # Reshape back to batch dims
-        return out_flat.reshape(*batch_dims, out_flat.shape[1])
+        return out_flat.reshape(*batch_dims, out_flat.shape[-1])
+    
+    def draw(self, backend="")
     
         
