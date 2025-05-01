@@ -78,6 +78,52 @@ class QSubLayer(Module):
 
 
 class QLayer(Module):
+    """
+        Default Pytorch Module interface class for quantum circuit. 
+        Alternative version of `TorchLayer` in Pennylane. 
+
+        Args:
+            wires (int): Number of qubit wires
+            q_device (Union[str, QDevice], optional): Pennylane quantum device. It could be a string or `Device` object of Pennylane. Defaults to 'default.qubit'.
+            q_device_kwargs (dict, optional): Device arguments. Defaults to {}.
+            qnode_kwargs (dict, optional): Qnode initial setting arguments. Defaults to {"diff_method": "parameter-shift"}.
+
+        Returns:
+            _type_: _description_
+            
+        In children class, by redefining `inner_gates` and `measurment` attributes, you can define torch interfaced Pennylane circuit.
+        Example:
+            ```
+            class QuantumLayer(QLayer):
+                def __init__(self, *args, **kwargs):
+                    super(QuantumLayer, self).__init__(*args, **kwargs)
+                def inner_gates(self, x=None):
+                    # You can define Pennylane circuit inside here.
+                    for w in range(self.wires):
+                        qml.Hadamard(wires=w)
+                        qml.PauliX(wires=w)
+                    qml.CNOT([0, 1])
+                def measurement(self): # measurement part.
+                    return qml.probs()
+            
+            qlayer = QuantumLayer(wires=4, qnode_kwargs={"diff_method":"backprops"})
+            ```
+            The above `QuantumLayer` definition is identical to next code.
+            
+            ```
+            import pennylane as qml
+            
+            wires = 4
+            dev = qml.dev("default.qubit", wires = wires)
+            @qml.qnode(dev, interface="torch", **qnode_kwargs)
+            def circuit(x=None):
+                for w in range(wires):
+                    qml.Hadamard(wires=w)
+                    qml.PauliX(wires=w)
+                wml.CNOT([0, 1])
+                return qml.probs()
+            ```
+    """
     _qsublayers:{Optional[QSubLayer]}
 
     def __init__(self, 
@@ -86,6 +132,7 @@ class QLayer(Module):
                  q_device_kwargs = {},
                  qnode_kwargs = {"diff_method": "parameter-shift"}
                  ):
+        
         super(QLayer, self).__init__()
         super().__setattr__("_qsublayers", {})
 
@@ -103,7 +150,11 @@ class QLayer(Module):
             qnode_kwargs["interface"] = "torch"
         self.qnode = QNode(_circuit, device=self.q_device, **qnode_kwargs)
     def __repr__(self):
-        pass
+        st = super().__repr__()
+        class_name = self._get_name()
+        st = st.replace(class_name, class_name+f"[Qnode, wires={self.wires}]")
+        return st
+        
     def _register_qsublayer(self, name, qsublayer:QSubLayer):
         """Add QSubLayer to QLayer.
 
@@ -166,6 +217,6 @@ class QLayer(Module):
         # Reshape back to batch dims
         return out_flat.reshape(*batch_dims, out_flat.shape[-1])
     
-    def draw(self, backend="")
+    #def draw(self, backend="")
     
         
