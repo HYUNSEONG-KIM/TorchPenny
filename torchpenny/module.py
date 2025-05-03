@@ -36,6 +36,9 @@ class QSubLayer(Module):
             if not self.param_received:
                 value = Parameter(value) 
         super().__setattr__(name, value)
+    def set_parameters(self, params):
+        assert params.shape == self.params.shape, "Dimensions are not matched."
+        self.params.data=(params)
     @property
     def input_dim(self):
         return self.params.shape if self.param_received else None
@@ -137,6 +140,7 @@ class QLayer(Module):
         super().__setattr__("_qsublayers", {})
 
         self.wires = wires
+        q_device_kwargs["wires"] = self.wires
         if isinstance(q_device, QDevice):
             self.q_device = q_device
         elif isinstance(q_device, str):
@@ -188,7 +192,15 @@ class QLayer(Module):
             return self.inner_gates()
         else:
             return self.inner_gates(x)
-
+    def update_qdevice(self, q_device:Union[str, QDevice], q_device_kwargs:dict={}, qnode_kwargs:dict={}):
+        if isinstance(q_device, QDevice):
+            self.q_device = q_device
+        elif isinstance(q_device, str):
+            self.q_device = get_q_device(q_device, **q_device_kwargs)
+        def _circuit(x:Optional[Union[Tensor, Tuple[Tensor]]] =None):
+            self._inner_gates(x)
+            return self.measurement()
+        self.qnode = QNode(_circuit, device=self.q_device, **qnode_kwargs)
     @abstractmethod
     def inner_gates(self, x:Optional[Union[Tensor, Tuple[Tensor]]]=None):
         pass
@@ -208,12 +220,22 @@ class QLayer(Module):
         elif isinstance(x, Iterable):
             x_flat = x # In this case, the user have to verify and manage the batch cases.
             batch_dims = ()
+            
         vals = self.qnode(x_flat)
+        if self.q_device.shots.total_shots is not None: # Sampling
+            return vals
+        
         # vals: list of (batch_flat,) tensors
         if isinstance(vals, Tensor):
             out_flat = vals
-        else:
-            out_flat = torch.stack(vals, axis=1)
+            # Scalar Tensor
+            if out_flat.dim()==0:
+                return out_flat
+        else:# Iterable
+            #Batched data
+            # Pennylane return column bached tensors.
+            axis = 0 if vals[0].dim() ==0 else 1
+            out_flat = torch.stack(vals, axis=axis)
         # Reshape back to batch dims
         return out_flat.reshape(*batch_dims, out_flat.shape[-1])
     
