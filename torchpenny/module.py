@@ -52,6 +52,14 @@ class QSubLayer(Module):
         params = self.init_weights()
         self._num_params = params.shape
         return params
+    def get_params(self, x:Union[Tensor, None]):
+        if self.param_received:
+            assert x is not None, "Received param module must get argument."
+            assert x.shape[-1] == self.num_params, "The given data was not matched with the layer input."
+            params = x
+        else:
+            params = self.params
+        return params
     @abstractmethod
     def init_weights(self):
         # init_method
@@ -192,7 +200,11 @@ class QLayer(Module):
             return self.inner_gates()
         else:
             return self.inner_gates(x)
+        
     def update_qdevice(self, q_device:Union[str, QDevice], q_device_kwargs:dict={}, qnode_kwargs:dict={}):
+        del(self.q_device)
+        del(self.qnode)
+        
         if isinstance(q_device, QDevice):
             self.q_device = q_device
         elif isinstance(q_device, str):
@@ -200,7 +212,9 @@ class QLayer(Module):
         def _circuit(x:Optional[Union[Tensor, Tuple[Tensor]]] =None):
             self._inner_gates(x)
             return self.measurement()
+        
         self.qnode = QNode(_circuit, device=self.q_device, **qnode_kwargs)
+        
     @abstractmethod
     def inner_gates(self, x:Optional[Union[Tensor, Tuple[Tensor]]]=None):
         pass

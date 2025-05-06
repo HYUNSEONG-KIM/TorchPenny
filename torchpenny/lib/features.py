@@ -38,11 +38,7 @@ class ZZfeatureMap(QSubLayer):
     
     def forward(self, x=None, wires=[]):
         assert len(wires) == (self.wires), "Applied wires must be matched with the defined qubit dimension."
-        if x is not None:
-            assert x.shape[-1] == self.num_params, "The given data was not matched with the layer input."
-            params = x
-        else:
-            params = self.params
+        params = self.get_params(x)
 
         if not self.only_zz:
             for i, w in enumerate(wires):

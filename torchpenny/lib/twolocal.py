@@ -6,7 +6,7 @@ import torch
 from torch.nn.parameter import Parameter
 
 from torchpenny.module import QSubLayer
-from torchpenny.lib.qlayer.utils import ENTANGLEMTNS, ROTATION_GATES, get_entanglement_map
+from torchpenny.lib.utils import ENTANGLEMTNS, ROTATION_GATES, get_entanglement_map
 
 
 class TwoLocalAnsatz(QSubLayer):
