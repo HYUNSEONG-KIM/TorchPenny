@@ -1,0 +1,12 @@
+Metadata-Version: 2.2
+Name: torchpenny
+Version: 0.0.1
+Summary: Pennylane based Quantum circuit layer library for PyTorch.
+Author: Hyunseong Kim
+Author-email: Hyunseong.Kim@rice.edu
+Requires-Dist: torch
+Requires-Dist: pennylane>=0.4.0
+Dynamic: author
+Dynamic: author-email
+Dynamic: requires-dist
+Dynamic: summary

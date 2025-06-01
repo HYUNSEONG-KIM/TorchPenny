@@ -73,9 +73,8 @@ There are two modules `QLayer` and `QSubLayer`.
 Original Pennylane library provides `TorchLayer`. 
 With `TorchLayer` you have to manage all parameters and input data at once on single function.
 
-1. `input_encoding`: Define a data flow to each parameterized gates.
-2. `inner_gates`: Internal circuit structure definition function.
-3. `measurement`: Measurement part of the quantum circuit.
+1. `inner_gates`: Internal circuit structure definition function.
+2. `measurement`: Measurement part of the quantum circuit.
 
 These inner methods are equivalent to the next circuit.
 
@@ -89,9 +88,13 @@ def circuit(x):
 
 ### QSubLayer
 
-`QSubLayer` is a basic module to perform the internal unitary gates.
+`QSubLayer` module is an alternative api of `Operation` or `Template` class of Pennylane framework. In Pennylane, `Template` class also provides a block layer of quantum gates. However, their parameters are given by user and external source. Users have to manage the parameter dimension data for each `Template` in the circuit. 
 
+Meanwhile, in Pytorch, all `Module` class manages its own parameter automatically. The input data and inherited weight and bias are seperated. To construct complicated circuit and program, this automatic management has many benefits not only for rapid prototyping but also for maintainance.
 
+Thus, `QSubLayer` provides automatic parameter management routine based on `Moudle` class. 
 
 
 ## Examples
+
+See `docs` notebooks.

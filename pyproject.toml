@@ -1,0 +1,20 @@
+
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torchpenny"
+authors = [
+    {name = "Hyunseong Kim", email = "Hyunseong.Kim@rice.edu"},
+]
+description = "Pennylane based quantum circuit module layer for Pytorch."
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["torch", "Quantum circuit", "Quantum Machine Learning"]
+license = "MIT-License"
+dependencies = [
+    "torch",
+    "pennylane>=0.4.0"
+]
