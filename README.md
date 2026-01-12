@@ -9,9 +9,9 @@ It is a light wrapper for user to design and to integrate quantum circuit into P
 The next code is an example to generate a quantum circuit layer.
 
 ```.{py}
-from torchpenny.moduel import QLayer
+from torchpenny.module import QLayer
 from torchpenny.lib.qlayer.features import ZZfeatureMap
-from torchpenny.lib.qlauer.ansatz import TwoLocalAnsatz
+from torchpenny.lib.qlayer.ansatz import TwoLocalAnsatz
 
 class QuantumLayer(QLayer): # Quantum Layer definition.
     def __init__(self, *args, **kwargs):
