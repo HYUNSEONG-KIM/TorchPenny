@@ -1,0 +1,13 @@
+- QML 예제:
+    - QVAE
+    - QGNN
+    - Transformer implementation
+
+- Module.ipynb 부분 수정중
+    - Current: QSubLayer parameter management 수정 필요.
+---
+- VQE module.
+- Create discriminator model for MNIST data.
+- Module 부분 Pennylane 부분만 분리 기능 추가
+- Quantum Convolution Neural network 구현
+- Adding more various ansatzs(refer): Guo et al 2024, Quantum Circuit Ansatz Patterns of Abstraction and Reuse of Quantum Algorithm Design

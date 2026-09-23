@@ -1,3 +1,3 @@
 
 
-from swap_test import SWAPtest
+from .swap_test import SWAPtest

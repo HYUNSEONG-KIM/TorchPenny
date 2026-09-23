@@ -19,3 +19,4 @@ def get_entanglement_map(qubit:int, structure:str):
         return [(i, i+1) for i in range(qubit-1)]
     elif structure == "circular":
         return [(i, i+1) for i in range(qubit-1)] + [(qubit-1, 0)]
+

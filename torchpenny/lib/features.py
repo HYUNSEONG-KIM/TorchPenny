@@ -10,11 +10,11 @@ class ZfeatureMap(QSubLayer):
         return data.unsqueeze(0)
     def forward(self, x=None, wires=[]):
         assert len(wires) == (self.wires), "Applied wires must be matched with the defined qubit dimension."
-        params = x if self.param_received and x is not None else self.params
-
+        params = self.get_params(x)
+        
         for i, w in enumerate(wires):
             qml.Hadamard(wires=w)
-            qml.RZ(params[:, i], w) # batch input을 위해 항상 [:, .] 형태로 두는 것을 권장.
+            qml.RZ(params[:, i], w) # To get the batch input, I recommend it to be [:, .] shape.
 
 class ZZfeatureMap(QSubLayer):
     entanglement_structure= [
@@ -29,7 +29,6 @@ class ZZfeatureMap(QSubLayer):
         self.only_zz = only_zz
 
         super(ZZfeatureMap, self).__init__(wires=wires, param_received=param_received)
-        
 
     def init_weights(self):
         n = self.wires-1 if self.only_zz else 2*self.wires -1

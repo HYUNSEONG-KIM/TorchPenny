@@ -2,7 +2,7 @@
 
 #--------------------------
 '''
-Created by : Hyunseong Kim (2025)
+Created by : Hyunseong Kim (2026)
 
 MIT License
 
@@ -29,11 +29,11 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEAL
 __version__ = '0.0.1'
 __authors__ = ", ".join(['Hyunseong Kim'])
 
-from torchpenny.module import (
+from .module import (
     QLayer,
     QSubLayer
 )
 __all__ = [
-    'module',
-    'lib'
+    'QLayer',
+    'QSubLayer'
 ]

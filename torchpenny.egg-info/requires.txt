@@ -1,2 +1,0 @@
-torch
-pennylane>=0.4.0

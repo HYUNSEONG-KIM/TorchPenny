@@ -3,15 +3,34 @@
 
 TorchPenny is a [Pennylane](https://docs.pennylane.ai) based quantum algorithm framework.
 It is a light wrapper for user to design and to integrate quantum circuit into PyTorch module and computation workflow.
+The object of the framework is to provide a simple way to manage the reusable quantum circuit design with Pennylane to be used in PyTorch.
+
+## Workflow in Pennylanea and PyTorch integration.
+
+- [PyTorch Interface of Pennylane](https://docs.pennylane.ai/en/stable/introduction/interfaces/torch.html)
+
+Pennylane is well combined in PyTorch ecosystem, still it's design is far from the usual workflow of PyTorch framework.
+However, when you want to reuse the quantum circuit module, you should manage the input and output parameters for each circuit function.
+When you forgot the input dimension and output dimension, it will disrupt the training and workflow.
+However, in PyTorch all the module has their on information of in/out tensor dimension and even though you forgot the information, you can directly check the module information from the object.
+
+The object of this project is to get the benefit of PyTorch module design when we design a QML module, providing more familiar interface to PyTorch developers and keeping the design process of Pennylane.
+
 
 ## Basic usage
 
 The next code is an example to generate a quantum circuit layer.
 
+Each `QLayer` must return measurements of one type only. A single `qml.probs()` or multiple `qml.expval()` results can be used, but mixing measurement types raises `ValueError` before device execution. Sample-only circuits remain supported.
+
+`QLayer` defaults to `interface="torch"`, including circuits without external inputs. An interface explicitly supplied in `qnode_kwargs` is not overwritten; the layer's output processing expects Torch tensors.
+
+`update_qdevice()` preserves the configured QNode settings, including `interface` and `diff_method`. Pass `qnode_kwargs` to override individual settings. When switching from analytic backpropagation to finite shots, explicitly select a compatible method such as `"best"` or `"parameter-shift"`.
+
 ```.{py}
 from torchpenny.module import QLayer
-from torchpenny.lib.qlayer.features import ZZfeatureMap
-from torchpenny.lib.qlayer.ansatz import TwoLocalAnsatz
+from torchpenny.lib.features import ZZfeatureMap
+from torchpenny.lib.ansatz import TwoLocalAnsatz
 
 class QuantumLayer(QLayer): # Quantum Layer definition.
     def __init__(self, *args, **kwargs):
@@ -37,7 +56,7 @@ class QuantumLayer(QLayer): # Quantum Layer definition.
 qlayer = QuantumLayer(wires= 8, q_device = "default.qubit", qnode_kwargs={"diff_method": "backprop"})
 
 batch_dim = 4
-input_dim = qlyaer.zzf_input.params.shape[0] # 15 It is determined by parameterized gates.
+input_dim = qlayer.zzf_input.num_params # 15 It is determined by parameterized gates.
 
 data = torch.rand((batch_dim, input_dim))
 

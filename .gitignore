@@ -1,2 +1,15 @@
-*.pyc
-*.pyc
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated packaging artifacts
+/build/
+/dist/
+*.egg-info/
+
+# Notebook checkpoints and macOS metadata
+.ipynb_checkpoints/
+.DS_Store
