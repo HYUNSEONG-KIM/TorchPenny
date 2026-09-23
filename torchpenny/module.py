@@ -92,6 +92,29 @@ class QSubLayer(Module, ABC):
         else:
             params = self.params
         return params
+    @classmethod
+    def from_pennylane(cls, template, wires:int, param_received=False, *,
+                       shape_kwargs=None, parameter_shape=None, operation_kwargs=None):
+        """Wrap a PennyLane Operation class taking one tensor followed by wires.
+
+        Returns a QSubLayer instance, not an instance of the calling subclass.
+        If parameter_shape is omitted, template.shape(**shape_kwargs) is used;
+        n_wires is filled from wires when the shape function declares it.
+        Shape options and operation constructor options are kept separate.
+
+        Owned parameters use the native template shape and torch.rand initialization.
+        External inputs use (B, N), where N is the product of the template shape.
+        Forward restores (B, *template_shape); broadcasting and differentiability
+        must be supported by the template itself. Multiple parameter tensors and
+        already constructed operations are not supported.
+
+        Example:
+            QSubLayer.from_pennylane(qml.StronglyEntanglingLayers, wires=4,
+                                    shape_kwargs={"n_layers": 2})
+        """
+        return _PennyLaneSubLayer(template, wires, param_received,
+                                 shape_kwargs=shape_kwargs, parameter_shape=parameter_shape,
+                                 operation_kwargs=operation_kwargs)
     @abstractmethod
     def init_weights(self):
         # init_method
@@ -115,6 +138,75 @@ class QSubLayer(Module, ABC):
     #        @staticmethod
     #        def compute_decomposition(*params, wires = None, **hyperparameters):
     #            return 
+
+
+class _PennyLaneSubLayer(QSubLayer):
+    def __init__(self, template, wires:int, param_received=False, *,
+                 shape_kwargs=None, parameter_shape=None, operation_kwargs=None):
+        if type(wires) is not int:
+            raise TypeError("`wires` must be an integer.")
+        if wires <= 0:
+            raise ValueError("`wires` must be positive.")
+        if not isinstance(template, type) or not issubclass(template, Operation):
+            raise TypeError("`template` must be a PennyLane Operation class, not an instance.")
+
+        shape_options = dict(shape_kwargs or {})
+        operation_options = dict(operation_kwargs or {})
+        constructor = signature(template)
+        arguments = list(constructor.parameters)
+        if len(arguments) < 2 or arguments[1] != "wires":
+            raise TypeError("The template must take one parameter tensor followed by `wires`.")
+        # Also reject duplicated parameters, wires, unknown options and missing options.
+        constructor.bind(None, wires=range(wires), **operation_options)
+
+        if parameter_shape is None:
+            shape_function = getattr(template, "shape", None)
+            if not callable(shape_function):
+                raise ValueError("This template has no shape() method. Supply `parameter_shape`.")
+            if "n_wires" in signature(shape_function).parameters:
+                if "n_wires" in shape_options and shape_options["n_wires"] != wires:
+                    raise ValueError("`shape_kwargs['n_wires']` must match `wires`.")
+                shape_options["n_wires"] = wires
+            parameter_shape = shape_function(**shape_options)
+        elif shape_options:
+            raise ValueError("Use either `parameter_shape` or `shape_kwargs`, not both.")
+        if not isinstance(parameter_shape, (tuple, list, torch.Size)):
+            raise TypeError("`parameter_shape` must be a tuple or list of dimensions.")
+        if any(type(d) is not int or d <= 0 for d in parameter_shape):
+            raise ValueError("Template shape dimensions must be positive integers.")
+
+        self.template = template
+        self.template_shape = tuple(parameter_shape)
+        self.operation_kwargs = operation_options
+        super(_PennyLaneSubLayer, self).__init__(wires, param_received)
+
+    def init_weights(self):
+        if self.param_received:
+            size = 1
+            for d in self.template_shape:
+                size *= d
+            return torch.empty(1, size)
+        return torch.rand(self.template_shape)
+
+    def forward(self, x=None, wires=None):
+        wires = Wires(range(self.wires) if wires is None else wires)
+        if len(wires) != self.wires:
+            raise ValueError("Applied wires must match the defined qubit dimension.")
+        if self.param_received:
+            if not isinstance(x, Tensor):
+                raise TypeError("External parameters must be a Tensor.")
+            if x.dim() != 2 or x.shape[1] != self.num_params:
+                raise ValueError("External parameters must have shape (B, N), with N = num_params.")
+        params = self.get_params(x)
+        if self.param_received:
+            params = params.reshape((params.shape[0],) + self.template_shape)
+        operation = self.template(params, wires=wires, **self.operation_kwargs)
+        if operation.num_params != 1:
+            raise ValueError("Only templates with one parameter tensor are supported.")
+        return operation
+
+    def extra_repr(self):
+        return f"template={self.template.__name__}, wires={self.wires}, template_shape={self.template_shape}"
 
 
 class QLayer(Module):
@@ -198,14 +290,15 @@ class QLayer(Module):
             
         self.wires = wires 
 
-        def _circuit(x:Optional[Union[Tensor, Tuple[Tensor]]] =None):
-            self._inner_gates(x)
-            return self._measurement()
-        
         if "interface" not in qnode_options.keys():
             qnode_options["interface"] = "torch"
-        self.qnode = QNode(_circuit, device=self.q_device, **qnode_options)
+        self.qnode = QNode(self._circuit, device=self.q_device, **qnode_options)
         self._qnode_kwargs = qnode_options.copy()
+
+    def _circuit(self, x:Optional[Union[Tensor, Tuple[Tensor]]]=None):
+        # A bound method follows the copied module; a local closure keeps the original self.
+        self._inner_gates(x)
+        return self._measurement()
 
     def __repr__(self):
         st = super().__repr__()
@@ -267,11 +360,7 @@ class QLayer(Module):
         if new_device.wires is not None and len(new_device.wires) != self.wires:
             raise ValueError("The new device must have the same number of wires as the layer.")
 
-        def _circuit(x:Optional[Union[Tensor, Tuple[Tensor]]] =None):
-            self._inner_gates(x)
-            return self._measurement()
-
-        new_qnode = QNode(_circuit, device=new_device, **qnode_options)
+        new_qnode = QNode(self._circuit, device=new_device, **qnode_options)
         # Replace the working objects only after both constructions succeed.
         self.q_device = new_device
         self.qnode = new_qnode
